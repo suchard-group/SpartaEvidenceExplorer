@@ -289,10 +289,10 @@ prepareTable1 <- function(balance,
           balanceSubset$covariateName <- fixCase(gsub("^.*: ", "", balanceSubset$covariateName))
           if (specifications$covariateIds[i] == "" || length(covariateIds) > 1) {
           resultsTable <- rbind(resultsTable, data.frame(Characteristic = specifications$label[i],
-                                                         beforeMatchingMeanTreated = NA,
+                                                         beforeMatchingMeanTarget = NA,
                                                          beforeMatchingMeanComparator = NA,
                                                          beforeMatchingStdDiff = NA,
-                                                         afterMatchingMeanTreated = NA,
+                                                         afterMatchingMeanTarget = NA,
                                                          afterMatchingMeanComparator = NA,
                                                          afterMatchingStdDiff = NA,
                                                          stringsAsFactors = FALSE))
@@ -301,19 +301,19 @@ prepareTable1 <- function(balance,
                                                                                  space,
                                                                                  space,
                                                                                  balanceSubset$covariateName),
-                                                         beforeMatchingMeanTreated = balanceSubset$beforeMatchingMeanTreated,
+                                                         beforeMatchingMeanTarget = balanceSubset$beforeMatchingMeanTarget,
                                                          beforeMatchingMeanComparator = balanceSubset$beforeMatchingMeanComparator,
                                                          beforeMatchingStdDiff = balanceSubset$beforeMatchingStdDiff,
-                                                         afterMatchingMeanTreated = balanceSubset$afterMatchingMeanTreated,
+                                                         afterMatchingMeanTarget = balanceSubset$afterMatchingMeanTarget,
                                                          afterMatchingMeanComparator = balanceSubset$afterMatchingMeanComparator,
                                                          afterMatchingStdDiff = balanceSubset$afterMatchingStdDiff,
                                                          stringsAsFactors = FALSE))
           } else {
           resultsTable <- rbind(resultsTable, data.frame(Characteristic = specifications$label[i],
-                                                         beforeMatchingMeanTreated = balanceSubset$beforeMatchingMeanTreated,
+                                                         beforeMatchingMeanTarget = balanceSubset$beforeMatchingMeanTarget,
                                                          beforeMatchingMeanComparator = balanceSubset$beforeMatchingMeanComparator,
                                                          beforeMatchingStdDiff = balanceSubset$beforeMatchingStdDiff,
-                                                         afterMatchingMeanTreated = balanceSubset$afterMatchingMeanTreated,
+                                                         afterMatchingMeanTarget = balanceSubset$afterMatchingMeanTarget,
                                                          afterMatchingMeanComparator = balanceSubset$afterMatchingMeanComparator,
                                                          afterMatchingStdDiff = balanceSubset$afterMatchingStdDiff,
                                                          stringsAsFactors = FALSE))
@@ -323,27 +323,27 @@ prepareTable1 <- function(balance,
     }
   }
 
-  resultsTable$beforeMatchingMeanTreated <- formatPercent(resultsTable$beforeMatchingMeanTreated)
+  resultsTable$beforeMatchingMeanTarget <- formatPercent(resultsTable$beforeMatchingMeanTarget)
   resultsTable$beforeMatchingMeanComparator <- formatPercent(resultsTable$beforeMatchingMeanComparator)
   resultsTable$beforeMatchingStdDiff <- formatStdDiff(resultsTable$beforeMatchingStdDiff)
-  resultsTable$afterMatchingMeanTreated <- formatPercent(resultsTable$afterMatchingMeanTreated)
+  resultsTable$afterMatchingMeanTarget <- formatPercent(resultsTable$afterMatchingMeanTarget)
   resultsTable$afterMatchingMeanComparator <- formatPercent(resultsTable$afterMatchingMeanComparator)
   resultsTable$afterMatchingStdDiff <- formatStdDiff(resultsTable$afterMatchingStdDiff)
 
   headerRow <- as.data.frame(t(rep("", ncol(resultsTable))))
   colnames(headerRow) <- colnames(resultsTable)
-  headerRow$beforeMatchingMeanTreated <- targetLabel
+  headerRow$beforeMatchingMeanTarget <- targetLabel
   headerRow$beforeMatchingMeanComparator <- comparatorLabel
-  headerRow$afterMatchingMeanTreated <- targetLabel
+  headerRow$afterMatchingMeanTarget <- targetLabel
   headerRow$afterMatchingMeanComparator <- comparatorLabel
 
   subHeaderRow <- as.data.frame(t(rep("", ncol(resultsTable))))
   colnames(subHeaderRow) <- colnames(resultsTable)
   subHeaderRow$Characteristic <- "Characteristic"
-  subHeaderRow$beforeMatchingMeanTreated <- "%"
+  subHeaderRow$beforeMatchingMeanTarget <- "%"
   subHeaderRow$beforeMatchingMeanComparator <- "%"
   subHeaderRow$beforeMatchingStdDiff <- "Std. diff"
-  subHeaderRow$afterMatchingMeanTreated <- "%"
+  subHeaderRow$afterMatchingMeanTarget <- "%"
   subHeaderRow$afterMatchingMeanComparator <- "%"
   subHeaderRow$afterMatchingStdDiff <- "Std. diff"
 
@@ -426,6 +426,8 @@ plotAllPs <- function(ps) {
 
 
 plotCovariateBalanceScatterPlot <- function(balance, beforeLabel = "Before stratification", afterLabel = "After stratification") {
+  balance$absBeforeMatchingStdDiff <- abs(balance$beforeMatchingStdDiff)
+  balance$absAfterMatchingStdDiff <- abs(balance$afterMatchingStdDiff)
   limits <- c(min(c(balance$absBeforeMatchingStdDiff, balance$absAfterMatchingStdDiff),
                   na.rm = TRUE),
               max(c(balance$absBeforeMatchingStdDiff, balance$absAfterMatchingStdDiff),

@@ -42,8 +42,8 @@ propensityScoreMask <- tibble::tibble(
 )
 
 timeAtRiskMask <- tibble::tibble(
-  label = c("Intent-to-treat (ITT)", "On-treatment (OT)", "OT and censor at +agent"),
-  multiplier = c(1, 0, 2)
+  label = c("Intent-to-treat (ITT)", "On-treatment (OT)", "OT and censor at +agent", "more1", "more2", "more3", "more4", "more5", "more6", "more7", "more8"),
+  multiplier = c(1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 )
 
 mapAnalysisIdForBalance <- function(analysisId) {
