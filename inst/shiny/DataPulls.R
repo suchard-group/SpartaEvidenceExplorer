@@ -65,7 +65,7 @@ getOutcomes <- function(connection) {
 }
 
 getAnalyses <- function(connection) {
-  sql <- "SELECT analysis_id, description FROM cohort_method_analysis"
+  sql <- "SELECT analysis_id, description FROM cm_analysis"
   sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
   analyses <- DatabaseConnector::querySql(connection, sql)
   colnames(analyses) <- SqlRender::snakeCaseToCamelCase(colnames(analyses))
@@ -108,7 +108,7 @@ getTcoDbs <- function(connection,
                       outcomeIds = c(),
                       databaseIds = c(),
                       operator = "AND") {
-  sql <- "SELECT target_id, comparator_id, outcome_id, database_id FROM cohort_method_result WHERE analysis_id = 1"
+  sql <- "SELECT target_id, comparator_id, outcome_id, database_id FROM cm_result WHERE analysis_id = 1"
   parts <- c()
   if (length(targetIds) != 0) {
     parts <- c(parts, paste0("target_id IN (", paste(targetIds, collapse = ", "), ")"))
@@ -136,7 +136,7 @@ getTcoDbs <- function(connection,
 }
 
 getTcoDbsStrict <- function(connection, exposureIds = c(), outcomeIds = c(), databaseIds = c()) {
-  sql <- "SELECT target_id, comparator_id, outcome_id, database_id FROM cohort_method_result WHERE analysis_id = 1"
+  sql <- "SELECT target_id, comparator_id, outcome_id, database_id FROM cm_result WHERE analysis_id = 1"
   parts <- c()
   if (length(exposureIds) != 0) {
     for (exposureId in exposureIds) {
@@ -255,14 +255,14 @@ getControlResults <- function(connection, targetId, comparatorId, analysisId, da
     results <- results[!is.na(results$effectSize), ]
   } else {
       sql <- "SELECT *
-        FROM cohort_method_result
+        FROM cm_result
         INNER JOIN (
           SELECT outcome_id,
             outcome_name,
             CAST(1 AS FLOAT) AS effect_size
           FROM negative_control_outcome
         ) outcomes
-      ON cohort_method_result.outcome_id = outcomes.outcome_id
+      ON cm_result.outcome_id = outcomes.outcome_id
       WHERE target_id = @target_id
       AND comparator_id = @comparator_id
       AND database_id = '@database_id'

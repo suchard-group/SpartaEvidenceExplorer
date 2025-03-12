@@ -167,10 +167,10 @@ if (databaseMode) {
   cohortMethodAnalysis <- getAnalyses(connection)
 
   sql <- "SELECT
-    DISTINCT target_id, comparator_id, cohort_method_result.outcome_id
-  FROM cohort_method_result
+    DISTINCT target_id, comparator_id, cm_result.outcome_id
+  FROM cm_result
   INNER JOIN outcome_of_interest ON
-    cohort_method_result.outcome_id = outcome_of_interest.outcome_id"
+    cm_result.outcome_id = outcome_of_interest.outcome_id"
 
   tcos <- DatabaseConnector::querySql(connection = connection,
                                       sql = sql)
@@ -178,7 +178,7 @@ if (databaseMode) {
   colnames(tcos) <- SqlRender::snakeCaseToCamelCase(colnames(tcos))
 
   sql <- paste0(
-    "SELECT * FROM cohort_method_result WHERE outcome_id IN (",
+    "SELECT * FROM cm_result WHERE outcome_id IN (",
     paste(outcomeOfInterest$outcomeId, collapse = ","),
     ")")
 
@@ -187,8 +187,8 @@ if (databaseMode) {
 
   # loadResultsTable("attrition")
   # loadResultsTable("cm_follow_up_dist")
-  # loadResultsTable("cohort_method_analysis")
-  # loadResultsTable("cohort_method_result")
+  # loadResultsTable("cm_analysis")
+  # loadResultsTable("cm_result")
   # loadResultsTable("comparison_summary")
   # loadResultsTable("covariate")
   # loadResultsTable("covariate_analysis")
@@ -253,6 +253,15 @@ if (databaseMode) {
   for (removePart in removeParts) {
     invisible(lapply(files[grepl(removePart, files)], loadFile, removePart))
   }
+
+  cohortMethodResult <- cmResult
+  attrition <- cmAttrition
+  cohortMethodAnalysis <- cmAnalysis
+  covariateBalance <- cmCovariateBalance
+  covariateAnalysis <- cmCovariateAnalysis
+  covariate <- cmCovariate
+  propensityModel <- cmPropensityModel
+  preferenceScoreDist <- cmPreferenceScoreDist
 
   tcos <- unique(cohortMethodResult[, c("targetId", "comparatorId", "outcomeId")])
   tcos <- tcos[tcos$outcomeId %in% outcomeOfInterest$outcomeId, ]
