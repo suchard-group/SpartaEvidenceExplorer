@@ -4,6 +4,7 @@
 
 source("DataPulls.R")
 source("PlotsAndTables.R")
+library(formattable)
 
 getConfiguration <- function(label) {
   sourceFile <- "config.json"
@@ -39,11 +40,6 @@ cohortMask <- readr::read_csv(file.path("settings", "masks.csv"))
 propensityScoreMask <- tibble::tibble(
   label = c("unadjusted", "matched", "stratified"),
   index = c(1, 2, 3)
-)
-
-timeAtRiskMask <- tibble::tibble(
-  label = c("Intent-to-treat (ITT)", "On-treatment (OT)", "OT and censor at +agent", "more1", "more2", "more3", "more4", "more5", "more6", "more7", "more8"),
-  multiplier = c(1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 )
 
 mapAnalysisIdForBalance <- function(analysisId) {
@@ -262,14 +258,9 @@ if (databaseMode) {
   covariate <- cmCovariate
   propensityModel <- cmPropensityModel
   preferenceScoreDist <- cmPreferenceScoreDist
+  evalMetrics <- evalMetrics %>% filter(trueEffectSize == 1)
 
   tcos <- unique(cohortMethodResult[, c("targetId", "comparatorId", "outcomeId")])
   tcos <- tcos[tcos$outcomeId %in% outcomeOfInterest$outcomeId, ]
   metaAnalysisDbIds <- database$databaseId[database$isMetaAnalysis == 1]
-}
-
-if (includeLagged) {
-  timeAtRiskMask <- tibble::tibble(
-    label = c("Intent-to-treat (ITT)", "On-treatment (OT)", "OT and censor at +agent", "Lagged ITT"),
-    multiplier = c(1, 0, 2, 103 / 3))
 }

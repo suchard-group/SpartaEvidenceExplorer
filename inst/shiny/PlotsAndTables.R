@@ -1269,3 +1269,53 @@ plotForest <- function(results, limits = c(0.1, 10)) {
   plot <- gridExtra::grid.arrange(dataTable, plot, ncol = 2)
   return(plot)
 }
+
+getMetrics <- function(data){
+  return(MethodEvaluation::computeMetrics(logRr = data$logRr,
+                                          seLogRr = data$seLogRr,
+                                          ci95Lb = data$ci95Lb,
+                                          ci95Ub = data$ci95Ub,
+                                          p = data$p,
+                                          trueLogRr = log(data$trueEffectSize)))
+}
+
+plotEvalMetrics <- function(metrics){
+  table <- metrics %>%
+    select(analysisDescription,
+           auc,
+           coverage,
+           meanP,
+           mse,
+           type1,
+           type2,
+           nonEstimable) %>%
+    formattable::formattable(list(
+      auc = color_bar("lightpink"),
+      coverage = color_bar("lightpink"),
+      meanP = color_bar("lightpink"),
+      mse = color_bar("lightblue"),
+      type1 =color_bar("lightblue"),
+      type2 = color_bar("lightblue"),
+      nonEstimable = color_bar("lightgreen")
+    ),
+    align = "l") %>%
+    formattable::as.datatable(escape = FALSE,
+                 rownames = FALSE,
+                 colnames = c("Description", "AUC", "Coverage", "Mean Precision",
+                               "MSE", "Type-I Error", "Type-II Error", "Non-estimable (%)"),
+                 selection = "single",
+                 options = list(
+                   scrollX = TRUE,
+                   autoWidth = TRUE,
+                   columnDefs = list(
+                     list(targets = c(1:7),
+                          width = '50px'),
+                     list(targets = 0,
+                          width = '200px')
+                   )
+                 )
+    )
+
+  return(table)
+
+}

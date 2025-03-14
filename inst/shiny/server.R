@@ -61,16 +61,6 @@ shinyServer(function(input, output, session) {
     # Display only ittOt1
     # mask <- cohortMask$mask[cohortMask$tag == "ittOt1"]
     # subsetIds <- subsetIds[grep(mask, subsetIds)]
-    if (!(timeAtRiskMask$label[3] %in% input$timeAtRisk)) {
-      mask <- cohortMask$mask[cohortMask$tag == "ittOt1"]
-      subsetIds <- subsetIds[grep(mask, subsetIds)]
-    }
-
-    if (!(timeAtRiskMask$label[1] %in% input$timeAtRisk) &&
-        !(timeAtRiskMask$label[2] %in% input$timeAtRisk)) {
-      mask <- cohortMask$mask[cohortMask$tag == "ot2"]
-      subsetIds <- subsetIds[grep(mask, subsetIds)]
-    }
 
     if (mainMask != "") {
       subsetIds <- subsetIds[grep(mainMask, subsetIds)] # TODO should apply this to `exposureOfInterest` when read
@@ -113,11 +103,6 @@ shinyServer(function(input, output, session) {
 
   observeEvent(input$heterogeneity, {
     message("Just clicked: ", input$heterogeneity)
-    subsetByIds()
-  })
-
-  observeEvent(input$timeAtRisk, {
-    message("Just clicked: ", input$timeAtRisk)
     subsetByIds()
   })
 
@@ -164,18 +149,9 @@ shinyServer(function(input, output, session) {
     # outcomeId <- outcomeOfInterest$outcomeId[outcomeOfInterest$outcomeName == input$outcome]
     outcomeId <- outcomeInfo$cohortId[outcomeInfo$atlasName == input$outcome]
 
-    propensityScoreValues <- propensityScoreMask %>% filter(.data$label %in% input$propensityScore) %>% pull(.data$index)
-    timeAtRiskValues <- timeAtRiskMask %>% filter(.data$label %in% input$timeAtRisk) %>% pull(.data$multiplier)
-
-    message("timeAtRiskValues: ", paste(timeAtRiskValues, collapse = " "))
-    message("propensityScoreValues: ", paste(propensityScoreValues, collapse = " "))
-
-    analysisIds <- c(outer(propensityScoreValues, timeAtRiskValues,
-                           function(x, y) { x + 3 * y }))
+    analysisIds <- cohortMethodAnalysis$analysisId
 
     message("analysisIds: ", paste(analysisIds, collapse = " "))
-
-    analysisIds <- cohortMethodAnalysis$analysisId[cohortMethodAnalysis$analysisId %in% analysisIds]
 
     # useOt1 <- timeAtRiskMask$label[1] %in% input$timeAtRisk || timeAtRiskMask$label[2] %in% input$timeAtRisk
     # useOt2 <- timeAtRiskMask$label[3] %in% input$timeAtRisk
@@ -299,36 +275,22 @@ shinyServer(function(input, output, session) {
   outputOptions(output, "isMetaAnalysis", suspendWhenHidden = FALSE)
 
   output$mainTable <- renderDataTable({
-    table <- resultSubset()
-    if (is.null(table) || nrow(table) == 0) {
-      return(NULL)
-    }
-    table$description <- cohortMethodAnalysis$description[match(table$analysisId, cohortMethodAnalysis$analysisId)]
-    table <- table[, mainColumns]
-    table$rr <- prettyHr(table$rr)
-    table$ci95Lb <- prettyHr(table$ci95Lb)
-    table$ci95Ub <- prettyHr(table$ci95Ub)
-    table$p <- prettyHr(table$p)
-    table$calibratedRr <- prettyHr(table$calibratedRr)
-    table$calibratedCi95Lb <- prettyHr(table$calibratedCi95Lb)
-    table$calibratedCi95Ub <- prettyHr(table$calibratedCi95Ub)
-    table$calibratedP <- prettyHr(table$calibratedP)
-    colnames(table) <- mainColumnNames
-    options = list(pageLength = 15,
-                   searching = FALSE,
-                   lengthChange = TRUE,
-                   ordering = TRUE,
-                   paging = TRUE,
-                   autoWidth = FALSE,
-                   columnDefs = list(list(width = '60px', targets = c(2:9))))
-    selection = list(mode = "single", target = "row")
-    table <- datatable(table,
-                       options = options,
-                       selection = selection,
-                       rownames = FALSE,
-                       escape = FALSE,
-                       class = "stripe nowrap compact")
-    return(table)
+
+    targetIdOfInterest <- exposureOfInterest$exposureId[exposureOfInterest$exposureName == input$target]
+    comparatorIdOfInterest <- exposureOfInterest$exposureId[exposureOfInterest$exposureName == input$comparator]
+
+    metricsTable <- evalMetrics %>% filter(targetId ==  targetIdOfInterest & comparatorId == comparatorIdOfInterest)
+
+    metricsTable <- split(metricsTable, metricsTable$analysisId)
+    evalMetricsTable <- sapply(1:length(metricsTable), function(x)getMetrics(metricsTable[[x]])) %>%
+      t() %>%
+      as_tibble() %>%
+      mutate(analysisDescription = cohortMethodAnalysis$description,
+             analysisId = cohortMethodAnalysis$analysisId)
+    evalMetricsTable <- plotEvalMetrics(evalMetricsTable)
+
+    return(evalMetricsTable)
+
   })
 
   output$powerTableCaption <- renderUI({
@@ -989,4 +951,59 @@ shinyServer(function(input, output, session) {
     }
   })
 
+  output$summaryTable <- renderDataTable({
+
+    if(input$summaryOption == "Summary"){
+      metricsTable <- evalMetrics
+      metricsTable <- split(metricsTable, metricsTable$analysisId)
+      evalMetricsTable <- sapply(1:length(metricsTable), function(x)getMetrics(metricsTable[[x]])) %>%
+        t() %>%
+        as_tibble() %>%
+        mutate(analysisDescription = cohortMethodAnalysis$description,
+               analysisId = cohortMethodAnalysis$analysisId)
+    } else {
+      targets <- evalMetrics$targetId %>% unique()
+      pairs <- combn(targets, 2) %>% t() %>% as_tibble()
+      colnames(pairs) <- c("target", "comparator")
+      pairs$id <- 1:nrow(pairs)
+
+      allMetricsTables <- list()
+      for(i in 1:nrow(pairs)){
+        # Filter metricsTable for the current target/comparator pair
+        metricsTable <- evalMetrics %>%
+          filter(targetId == pairs$target[i] & comparatorId == pairs$comparator[i])
+
+        # Split the metricsTable by analysisId
+        metricsTable <- split(metricsTable, metricsTable$analysisId)
+
+        # Process each split table and combine them
+        evalMetricsTable <- sapply(1:length(metricsTable), function(x) getMetrics(metricsTable[[x]])) %>%
+          t() %>%
+          as_tibble() %>%
+          mutate(analysisDescription = cohortMethodAnalysis$description,
+                 analysisId = cohortMethodAnalysis$analysisId) %>%
+          arrange(analysisId) %>%
+          select(analysisId, auc, coverage, meanP, mse, type1, type2, nonEstimable)
+
+        # Store the processed metrics table in the list
+        allMetricsTables[[i]] <- evalMetricsTable
+      }
+      if(input$summaryOption == "Mean"){
+        evalMetricsTable <- Reduce(`+`, allMetricsTables) / length(allMetricsTables)
+        evalMetricsTable <- evalMetricsTable %>%
+          round(digits = 2) %>%
+          mutate(analysisDescription = cohortMethodAnalysis$description)
+      } else if (input$summaryOption == "Median"){
+        evalMetricsTable <- plyr::aaply(plyr::laply(allMetricsTables, as.matrix), c(2, 3), median)
+        evalMetricsTable <- evalMetricsTable %>%
+          as_tibble() %>%
+          round(digits = 2) %>%
+          mutate(analysisDescription = cohortMethodAnalysis$description)
+      }
+    }
+
+    summaryTable <- plotEvalMetrics(evalMetricsTable)
+
+    return(summaryTable)
+  })
 })

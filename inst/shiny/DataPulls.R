@@ -432,7 +432,7 @@ getPs <- function(connection, targetIds, comparatorIds, analysisId, databaseId =
 
   if (is.null(connection)) {
     if(databaseId != "") {
-      file <- sprintf("preference_score_dist_t%s_c%s_%s.rds", targetIds, comparatorIds, databaseId)
+      file <- sprintf("cm_preference_score_dist_t%s_c%s_%s.rds", targetIds, comparatorIds, databaseId)
       ps <- readRDS(file.path(dataFolder, file))
     } else {
       psFiles <- list.files(dataFolder, pattern = sprintf("^preference_score_dist_t%s_c%s_.*\\.rds", targetIds, comparatorIds), full.names = TRUE)
@@ -472,7 +472,7 @@ getKaplanMeier <- function(connection, targetId, comparatorId, outcomeId, databa
 
   if(is.null(connection)){
     # reading from local results folder
-    file <- sprintf("kaplan_meier_dist_t%s_c%s_%s.rds", targetId, comparatorId, databaseId)
+    file <- sprintf("cm_kaplan_meier_dist_t%s_c%s_%s.rds", targetId, comparatorId, databaseId)
     km <- readRDS(file.path(dataFolder, file))
     colnames(km) <- SqlRender::snakeCaseToCamelCase(colnames(km))
     km <- km[km$outcomeId == outcomeId &
