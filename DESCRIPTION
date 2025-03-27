@@ -17,6 +17,7 @@ Imports:
   DatabaseConnector,
   dplyr,
   DT,
+  formattable,
   ggplot2,
   ggiraph,
   gtable,
@@ -31,5 +32,6 @@ Imports:
   shinyWidgets,
   stringr,
   SqlRender,
-  tidyr
-RoxygenNote: 7.1.2
+  tidyr,
+  tidyverse
+RoxygenNote: 7.3.2

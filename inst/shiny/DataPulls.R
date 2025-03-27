@@ -349,14 +349,16 @@ getCovariateBalance <- function(connection,
     }
 
     if (!is.null(databaseId)) {
-      file <- sprintf("covariate_balance_t%s_c%s_%s.rds", targetId, comparatorId, databaseId)
-      balance <- loadCovariateBalance(file.path(dataFolder, file))
+      # file <- sprintf("covariate_balance_t%s_c%s_%s.rds", targetId, comparatorId, databaseId)
+      # balance <- loadCovariateBalance(file.path(dataFolder, file))
+      balance <- covariateBalance
     } else {
       balanceFiles <- list.files(dataFolder, pattern = sprintf("^covariate_balance_t%s_c%s_.*\\.rds", targetId, comparatorId), full.names = TRUE)
       balance <- do.call("rbind", lapply(balanceFiles, loadCovariateBalance, parseDatabaseName = TRUE))
     }
-    colnames(balance) <- SqlRender::snakeCaseToCamelCase(colnames(balance))
-    balance <- balance[balance$analysisId == analysisId, ]
+    # colnames(balance) <- SqlRender::snakeCaseToCamelCase(colnames(balance))
+    balance <- balance[balance$analysisId == analysisId, ] %>%
+      filter(targetId == targetId & comparatorId == comparatorId)
     if (!is.null(outcomeId)) {
       balance <- balance[balance$outcomeId == outcomeId, ]
     } else {
@@ -368,7 +370,7 @@ getCovariateBalance <- function(connection,
                                           c("covariateId", "covariateAnalysisId", "covariateName")])
     else
       balance <- merge(balance, covariate[covariate$analysisId == analysisId,
-                                          c("covariateId", "covariateAnalysisId", "covariateName")])
+                                          c("covariateId")])
     balance <- balance[ c("databaseId",
                           "covariateId",
                           "covariateName",

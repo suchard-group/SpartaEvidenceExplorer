@@ -225,8 +225,8 @@ shinyServer(function(input, output, session) {
                                       targetId = targetId,
                                       comparatorId = comparatorId,
                                       databaseId = row$databaseId,
-                                      analysisId = mapAnalysisIdForBalance(row$analysisId),
-                                      outcomeId = NULL)
+                                      analysisId = row$analysisId,
+                                      outcomeId = outcomeId)
        return(balance)
      }
   })
