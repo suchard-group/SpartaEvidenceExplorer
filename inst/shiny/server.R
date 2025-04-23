@@ -274,15 +274,39 @@ shinyServer(function(input, output, session) {
   })
   outputOptions(output, "isMetaAnalysis", suspendWhenHidden = FALSE)
 
+  evalMetrics <- reactive({
+
+    metrics <- if (input$useCali) {
+      cohortMethodResult
+    } else {
+      cohortMethodResult %>%
+        select(-logRr, -seLogRr, -ci95Lb, -ci95Ub, -p, -llr) %>%
+        rename(
+          logRr = calibratedLogRr,
+          seLogRr = calibratedSeLogRr,
+          ci95Lb = calibratedCi95Lb,
+          ci95Ub = calibratedCi95Ub,
+          p = calibratedP,
+          llr = calibratedLlr
+        )
+    }
+
+    if (input$useNcsOnly) {
+      metrics <- metrics %>% filter(.data$trueEffectSize == 1)
+    }
+
+    return(metrics)
+  })
+
   output$mainTable <- renderDataTable({
 
     targetIdOfInterest <- exposureOfInterest$exposureId[exposureOfInterest$exposureName == input$target]
     comparatorIdOfInterest <- exposureOfInterest$exposureId[exposureOfInterest$exposureName == input$comparator]
 
-    metricsTable <- evalMetrics %>% filter(targetId ==  targetIdOfInterest & comparatorId == comparatorIdOfInterest)
+    metricsTable <- evalMetrics() %>% filter(targetId ==  targetIdOfInterest & comparatorId == comparatorIdOfInterest)
 
     metricsTable <- split(metricsTable, metricsTable$analysisId)
-    evalMetricsTable <- sapply(1:length(metricsTable), function(x)getMetrics(metricsTable[[x]])) %>%
+    evalMetricsTable <- sapply(1:length(metricsTable), function(x)computeMetrics(metricsTable[[x]])) %>%
       t() %>%
       as_tibble() %>%
       mutate(analysisDescription = cohortMethodAnalysis$description,
@@ -954,15 +978,15 @@ shinyServer(function(input, output, session) {
   output$summaryTable <- renderDataTable({
 
     if(input$summaryOption == "Summary"){
-      metricsTable <- evalMetrics
+      metricsTable <- evalMetrics()
       metricsTable <- split(metricsTable, metricsTable$analysisId)
-      evalMetricsTable <- sapply(1:length(metricsTable), function(x)getMetrics(metricsTable[[x]])) %>%
+      evalMetricsTable <- sapply(1:length(metricsTable), function(x)computeMetrics(metricsTable[[x]])) %>%
         t() %>%
         as_tibble() %>%
         mutate(analysisDescription = cohortMethodAnalysis$description,
                analysisId = cohortMethodAnalysis$analysisId)
     } else {
-      targets <- evalMetrics$targetId %>% unique()
+      targets <- evalMetrics()$targetId %>% unique()
       pairs <- combn(targets, 2) %>% t() %>% as_tibble()
       colnames(pairs) <- c("target", "comparator")
       pairs$id <- 1:nrow(pairs)
@@ -970,14 +994,14 @@ shinyServer(function(input, output, session) {
       allMetricsTables <- list()
       for(i in 1:nrow(pairs)){
         # Filter metricsTable for the current target/comparator pair
-        metricsTable <- evalMetrics %>%
+        metricsTable <- evalMetrics() %>%
           filter(targetId == pairs$target[i] & comparatorId == pairs$comparator[i])
 
         # Split the metricsTable by analysisId
         metricsTable <- split(metricsTable, metricsTable$analysisId)
 
         # Process each split table and combine them
-        evalMetricsTable <- sapply(1:length(metricsTable), function(x) getMetrics(metricsTable[[x]])) %>%
+        evalMetricsTable <- sapply(1:length(metricsTable), function(x) computeMetrics(metricsTable[[x]])) %>%
           t() %>%
           as_tibble() %>%
           mutate(analysisDescription = cohortMethodAnalysis$description,

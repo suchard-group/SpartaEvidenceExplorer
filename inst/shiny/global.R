@@ -259,13 +259,12 @@ if (databaseMode) {
   covariate <- cmCovariate
   propensityModel <- cmPropensityModel
   preferenceScoreDist <- cmPreferenceScoreDist
-  evalMetrics <- evalMetrics %>% filter(trueEffectSize == 1)
 
-  ## Remove empty cohorts
-  empty <- cmResult %>% filter(targetOutcomes ==0, comparatorOutcomes==0) %>%
-    select(analysisId, targetId, comparatorId, outcomeId, outcomeName)
-
-  evalMetrics <- anti_join(evalMetrics, empty, by = c("analysisId", "targetId", "comparatorId", "outcomeId"))
+  # ## Remove empty cohorts
+  # empty <- cmResult %>% filter(targetOutcomes ==0, comparatorOutcomes==0) %>%
+  #   select(analysisId, targetId, comparatorId, outcomeId, outcomeName)
+  #
+  # evalMetrics <- anti_join(evalMetrics, empty, by = c("analysisId", "targetId", "comparatorId", "outcomeId"))
 
   tcos <- unique(cohortMethodResult[, c("targetId", "comparatorId", "outcomeId")])
   tcos <- tcos[tcos$outcomeId %in% outcomeOfInterest$outcomeId, ]

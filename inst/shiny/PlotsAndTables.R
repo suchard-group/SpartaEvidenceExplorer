@@ -1270,13 +1270,79 @@ plotForest <- function(results, limits = c(0.1, 10)) {
   return(plot)
 }
 
-getMetrics <- function(data){
-  return(MethodEvaluation::computeMetrics(logRr = data$logRr,
-                                          seLogRr = data$seLogRr,
-                                          ci95Lb = data$ci95Lb,
-                                          ci95Ub = data$ci95Ub,
-                                          p = data$p,
-                                          trueLogRr = log(data$trueEffectSize)))
+computeMetrics <- function(data) {
+  # data <- EmpiricalCalibration::simulateControls(n = 50 * 3, mean = 0.25, sd = 0.25, trueLogRr =
+  # log(c(1, 2, 4))); logRr <- data$logRr; seLogRr <- data$seLogRr; trueLogRr <- data$trueLogRr
+  data <- data %>% mutate(trueLogRr = log(trueEffectSize))
+  errorMessages <- checkmate::makeAssertCollection()
+  checkmate::assertNumeric(data$logRr, min.len = 1, add = errorMessages)
+  checkmate::assertNumeric(data$seLogRr, len = length(data$logRr), null.ok = TRUE, add = errorMessages)
+  checkmate::assertNumeric(data$ci95Lb, len = length(data$logRr), null.ok = TRUE, add = errorMessages)
+  checkmate::assertNumeric(data$ci95Ub, len = length(data$logRr), null.ok = TRUE, add = errorMessages)
+  checkmate::assertNumeric(data$p, len = length(data$logRr), null.ok = TRUE, add = errorMessages)
+  checkmate::assertNumeric(data$trueLogRr, len = length(data$logRr), add = errorMessages)
+  checkmate::reportAssertions(collection = errorMessages)
+
+  if (is.null(data$seLogRr) && is.null(data$ci95Lb)) {
+    stop("Must specify either standard error or confidence interval")
+  }
+
+  if (is.null(seLogRr)) {
+    data$seLogRr <- (log(ci95Ub) - log(ci95Lb)) / (2 * qnorm(0.975))
+  }
+  if (is.null(data$ci95Lb)) {
+    data$ci95Lb <- exp(data$logRr + qnorm(0.025) * data$seLogRr)
+    data$ci95Ub <- exp(data$logRr + qnorm(0.975) * data$seLogRr)
+  }
+  if (is.null(p)) {
+    z <- data$logRr / data$seLogRr
+    data$p <- 2 * pmin(pnorm(z), 1 - pnorm(z))
+  }
+
+  noOutcomes <- data %>% filter(targetOutcomes == 0 | comparatorOutcomes == 0)
+  noOutcomes <- round(100 * nrow(noOutcomes)/nrow(data), 2)
+
+  data <- data %>% filter(targetOutcomes > 0 & comparatorOutcomes > 0)
+
+  idxNa <- is.na(data$logRr) | is.na(data$seLogRr)
+  idxInf <- is.infinite(data$logRr) | is.infinite(data$seLogRr)
+  idx <- idxNa | idxInf
+
+  data$logRr[idx] <- 0
+  data$seLogRr[idx] <- 999
+  data$ci95Lb[idx] <- 0
+  data$ci95Ub[idx] <- 999
+  data$p[idx] <- 1
+
+  nonEstimable <- round(sum(idxNa)/nrow(data) * 100, 2)
+  infEstimates <- round(sum(idxInf)/nrow(data) * 100, 2)
+
+  positive <- data$trueLogRr > 0
+  if (all(positive) | all(!positive)) {
+    auc <- NA
+  } else {
+    roc <- pROC::roc(positive, data$logRr, algorithm = 3)
+    auc <- round(pROC::auc(roc), 2)
+  }
+  mse <- round(mean((data$logRr - data$trueLogRr)^2), 2)
+  coverage <- round(
+    mean(data$ci95Lb < exp(data$trueLogRr) & data$ci95Ub > exp(data$trueLogRr)),
+    2
+  )
+  meanP <- round(-1 + exp(mean(log(1 + (1 / (data$seLogRr^2))))), 2)
+  type1 <- round(mean(data$p[data$trueLogRr == 0] < 0.05), 2)
+  type2 <- round(mean(data$p[data$trueLogRr > 0] >= 0.05), 2)
+  return(c(
+    auc = auc,
+    coverage = coverage,
+    meanP = meanP,
+    mse = mse,
+    type1 = type1,
+    type2 = type2,
+    noOutcomes = noOutcomes,
+    infEstimates = infEstimates,
+    nonEstimable = nonEstimable
+  ))
 }
 
 plotEvalMetrics <- function(metrics){
@@ -1288,7 +1354,8 @@ plotEvalMetrics <- function(metrics){
            mse,
            type1,
            type2,
-           nonEstimable) %>%
+           nonEstimable,
+           noOutcomes) %>%
     formattable::formattable(list(
       auc = color_bar("lightpink"),
       coverage = color_bar("lightpink"),
@@ -1296,13 +1363,15 @@ plotEvalMetrics <- function(metrics){
       mse = color_bar("lightblue"),
       type1 =color_bar("lightblue"),
       type2 = color_bar("lightblue"),
-      nonEstimable = color_bar("lightgreen")
+      nonEstimable = color_bar("lightgreen"),
+      noOutcomes = color_bar("lightgreen")
     ),
     align = "l") %>%
     formattable::as.datatable(escape = FALSE,
                  rownames = FALSE,
                  colnames = c("Description", "AUC", "Coverage", "Mean Precision",
-                               "MSE", "Type-I Error", "Type-II Error", "Non-estimable (%)"),
+                               "MSE", "Type-I Error", "Type-II Error", "Non-estimable (%)",
+                              "No Outcomes (%)"),
                  selection = "single",
                  options = list(
                    scrollX = TRUE,
