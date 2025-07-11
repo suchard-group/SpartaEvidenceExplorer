@@ -38,13 +38,14 @@ shinyUI(
           column(
             3,
             style = "background-color:#e8e8e8;",
-            selectInput("target", "Target", unique(exposureOfInterest$exposureName)),
-            selectInput("comparator", "Comparator", unique(exposureOfInterest$exposureName), selected = unique(exposureOfInterest$exposureName)[2]),
+            selectInput("target", "Target", unique(exposureOfInterest %>% filter(exposureId %in% tcos$targetId) %>% pull(exposureName))),
+            selectInput("comparator", "Comparator", exposureOfInterest %>% filter(exposureId %in% tcos$comparatorId) %>% pull(exposureName)),
             selectInput("outcome", "Outcome", unique(outcomeOfInterest$outcomeName)),
             div(
               strong("Filter results"),  # This is the title
               checkboxInput("useCali", "Use calibrated results", value = FALSE),
-              checkboxInput("useNcsOnly", "Only negative controls", value = FALSE)
+              checkboxInput("useNcsOnly", "Only negative controls", value = FALSE),
+              checkboxInput("orderByType", label = "Order by Type", value = FALSE)
             ),
             checkboxGroupInput("database", "Data source", database$databaseId, selected = database$databaseId),
             # checkboxGroupInput("analysis", "Analysis", cohortMethodAnalysis$description,  selected = cohortMethodAnalysis$description),

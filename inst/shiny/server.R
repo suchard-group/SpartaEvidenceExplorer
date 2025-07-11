@@ -275,11 +275,11 @@ shinyServer(function(input, output, session) {
   outputOptions(output, "isMetaAnalysis", suspendWhenHidden = FALSE)
 
   evalMetrics <- reactive({
+    metrics <- cohortMethodResult %>%
+      filter(!is.na(trueEffectSize))
 
-    metrics <- if (input$useCali) {
-      cohortMethodResult
-    } else {
-      cohortMethodResult %>%
+    if (input$useCali) {
+      metrics <- metrics %>%
         select(-logRr, -seLogRr, -ci95Lb, -ci95Ub, -p, -llr) %>%
         rename(
           logRr = calibratedLogRr,
@@ -298,8 +298,7 @@ shinyServer(function(input, output, session) {
     return(metrics)
   })
 
-  output$mainTable <- renderDataTable({
-
+  mainTableData <- reactive({
     targetIdOfInterest <- exposureOfInterest$exposureId[exposureOfInterest$exposureName == input$target]
     comparatorIdOfInterest <- exposureOfInterest$exposureId[exposureOfInterest$exposureName == input$comparator]
 
@@ -311,7 +310,12 @@ shinyServer(function(input, output, session) {
       as_tibble() %>%
       mutate(analysisDescription = cohortMethodAnalysis$description,
              analysisId = cohortMethodAnalysis$analysisId)
-    evalMetricsTable <- plotEvalMetrics(evalMetricsTable)
+    return(evalMetricsTable)
+  })
+  output$mainTable <- renderDataTable({
+
+    evalMetricsTable <- plotEvalMetrics(mainTableData(),
+                                        orderByType = input$orderByType)
 
     return(evalMetricsTable)
 

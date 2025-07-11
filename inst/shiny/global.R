@@ -69,7 +69,7 @@ connection <- NULL
 #
 
 defaultDatabaseMode <- TRUE
-defaultDataFolder <- "data"
+defaultDataFolder <- "shinyData"
 defaultServer <- Sys.getenv("shinydbServer")
 defaultDatabase <- Sys.getenv("shinydbDatabase")
 defaultPort <- 5432
@@ -107,7 +107,7 @@ if (!exists("shinySettings")) { # Running on ShinyDeploy server
     sql <- paste0("SET search_path TO ", resultsDatabaseSchema, ";")
     DatabaseConnector::executeSql(connection = connection, sql = sql)
   } else {
-    dataFolder <- defaultDataFolder
+    # dataFolder <- defaultDataFolder
   }
   headerText <- defaultHeaderText
   blind <- defaultBlind

@@ -1,0 +1,23 @@
+order,analysisId,analysisDescription,modelType
+1,1,Unadjusted,NA
+2,2,Matching 1:1,LSPS
+3,3,Matching 1:1 (conditional),LSPS
+4,4,Matching 1:5,LSPS
+5,5,Matching 1:10,LSPS
+6,17,Matching 1:25,LSPS
+7,8,Matching VR,LSPS
+8,6,Stratification 5 groups,LSPS
+9,7,IPTW (no trimming),LSPS
+10,9,IPTW (trimming),LSPS
+11,22,IPTW (overlap weights),LSPS
+12,10,IPTW (overlap weights + trimming),LSPS
+13,11,Matching 1:1,SSPS
+14,12,Matching 1:1 (conditional),SSPS
+15,13,Matching 1:5,SSPS
+16,18,Matching 1:25,SSPS
+17,15,Matching VR,SSPS
+18,14,Stratification 5 groups,SSPS
+19,19,IPTW (no trimming),SSPS
+20,16,IPTW (trimming),SSPS
+21,21,IPTW (overlap weights),SSPS
+22,20,IPTW (overlap weights + trimming),SSPS

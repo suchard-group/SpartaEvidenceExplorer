@@ -1287,35 +1287,70 @@ computeMetrics <- function(data) {
     stop("Must specify either standard error or confidence interval")
   }
 
-  if (is.null(seLogRr)) {
-    data$seLogRr <- (log(ci95Ub) - log(ci95Lb)) / (2 * qnorm(0.975))
+  if (is.null(data$seLogRr)) {
+    data$seLogRr <- (log(data$ci95Ub) - log(data$ci95Lb)) / (2 * qnorm(0.975))
   }
   if (is.null(data$ci95Lb)) {
     data$ci95Lb <- exp(data$logRr + qnorm(0.025) * data$seLogRr)
     data$ci95Ub <- exp(data$logRr + qnorm(0.975) * data$seLogRr)
   }
-  if (is.null(p)) {
+  if (is.null(data$p)) {
     z <- data$logRr / data$seLogRr
     data$p <- 2 * pmin(pnorm(z), 1 - pnorm(z))
   }
 
   noOutcomes <- data %>% filter(targetOutcomes == 0 | comparatorOutcomes == 0)
-  noOutcomes <- round(100 * nrow(noOutcomes)/nrow(data), 2)
+  fullData <- data
+  data <- data %>%
+    filter(targetOutcomes > 0 & comparatorOutcomes > 0)
+  noOutcomes <- round(100 * nrow(noOutcomes)/nrow(fullData), 2)
 
-  data <- data %>% filter(targetOutcomes > 0 & comparatorOutcomes > 0)
+  naData <- data %>% filter(is.na(logRr) | is.na(seLogRr))
+  data <- data %>% filter(!is.na(logRr) & !is.na(seLogRr))
 
-  idxNa <- is.na(data$logRr) | is.na(data$seLogRr)
-  idxInf <- is.infinite(data$logRr) | is.infinite(data$seLogRr)
-  idx <- idxNa | idxInf
+  naLikelihoods <- likelihoodProfile %>%
+    semi_join(naData, by = c("targetId", "comparatorId", "outcomeId", "analysisId")) %>%
+    group_by(targetId, comparatorId, outcomeId, analysisId)
 
-  data$logRr[idx] <- 0
-  data$seLogRr[idx] <- 999
-  data$ci95Lb[idx] <- 0
-  data$ci95Ub[idx] <- 999
-  data$p[idx] <- 1
+  checkLinearLikelihood <- function(df, tol = 0.0001) {
+    if (nrow(df) < 2) return(FALSE)
 
-  nonEstimable <- round(sum(idxNa)/nrow(data) * 100, 2)
-  infEstimates <- round(sum(idxInf)/nrow(data) * 100, 2)
+    df <- df[order(df$point), ]  # sort by point for consistency
+    deltas <- diff(df$value) / diff(df$point)
+
+    # All deltas should be very close to each other if linear
+    return(max(deltas) - min(deltas) <= tol)
+  }
+
+  checkMonotonicLikelihood <- function(df) {
+    df <- df[order(df$point), ]
+    is_increasing <- all(diff(df$value) >= 0)
+    is_decreasing <- all(diff(df$value) <= 0)
+    return(is_increasing || is_decreasing)
+  }
+
+  # Apply both checks per group
+  if(nrow(naLikelihoods) == 0){
+    likelihoodResults <- tibble(linear = 0,
+                                monotonic = 0,
+                                nonEstimable = 0)
+  } else{
+    likelihoodResults <- naLikelihoods %>%
+      group_by(targetId, comparatorId, outcomeId, analysisId) %>%
+      group_modify(~ {
+        df <- arrange(.x, point)
+        tibble(
+          linear = checkLinearLikelihood(df),
+          monotonic = checkMonotonicLikelihood(df)
+        )
+      }) %>%
+      ungroup() %>%
+      mutate(nonEstimable = !linear & !monotonic)
+  }
+
+  nonEstimable <- round(sum(likelihoodResults$nonEstimable)/nrow(fullData) * 100, 2)
+  monotonic <- round(sum(likelihoodResults$monotonic)/nrow(fullData) * 100, 2)
+  linear <- round(sum(likelihoodResults$linear)/nrow(fullData) * 100, 2)
 
   positive <- data$trueLogRr > 0
   if (all(positive) | all(!positive)) {
@@ -1332,6 +1367,12 @@ computeMetrics <- function(data) {
   meanP <- round(-1 + exp(mean(log(1 + (1 / (data$seLogRr^2))))), 2)
   type1 <- round(mean(data$p[data$trueLogRr == 0] < 0.05), 2)
   type2 <- round(mean(data$p[data$trueLogRr > 0] >= 0.05), 2)
+
+  if(length(unique(data$ease)) > 1){
+    warning("More than one unique value found in 'ease', still using mean.")
+  }
+  ease <- round(mean(data$ease), 2)
+
   return(c(
     auc = auc,
     coverage = coverage,
@@ -1339,23 +1380,42 @@ computeMetrics <- function(data) {
     mse = mse,
     type1 = type1,
     type2 = type2,
+    ease = ease,
     noOutcomes = noOutcomes,
-    infEstimates = infEstimates,
+    linear = linear,
+    monotonic = monotonic,
     nonEstimable = nonEstimable
   ))
 }
 
-plotEvalMetrics <- function(metrics){
+plotEvalMetrics <- function(metrics,
+                            orderByType = FALSE){
+  order <- read.csv("settings/MetricTableOrder.csv")
+  metrics <- metrics %>% select(-analysisDescription) %>%
+    left_join(order, by = "analysisId") %>%
+    arrange(order)
+
+  if(orderByType == TRUE){
+    group_order <- metrics %>% arrange(order) %>% pull(analysisDescription) %>% unique()
+    metrics <-  metrics %>%
+      mutate(analysisDescription = factor(analysisDescription, levels = group_order)) %>%
+      arrange(analysisDescription, modelType)
+  }
+
   table <- metrics %>%
     select(analysisDescription,
-           auc,
-           coverage,
-           meanP,
-           mse,
+           modelType,
            type1,
+           mse,
+           meanP,
+           coverage,
+           ease,
            type2,
-           nonEstimable,
-           noOutcomes) %>%
+           auc,
+           noOutcomes,
+           linear,
+           monotonic,
+           nonEstimable) %>%
     formattable::formattable(list(
       auc = color_bar("lightpink"),
       coverage = color_bar("lightpink"),
@@ -1363,21 +1423,25 @@ plotEvalMetrics <- function(metrics){
       mse = color_bar("lightblue"),
       type1 =color_bar("lightblue"),
       type2 = color_bar("lightblue"),
+      ease = color_bar("lightblue"),
+      linear = color_bar("lightgreen"),
+      monotonic = color_bar("lightgreen"),
       nonEstimable = color_bar("lightgreen"),
       noOutcomes = color_bar("lightgreen")
     ),
     align = "l") %>%
     formattable::as.datatable(escape = FALSE,
                  rownames = FALSE,
-                 colnames = c("Description", "AUC", "Coverage", "Mean Precision",
-                               "MSE", "Type-I Error", "Type-II Error", "Non-estimable (%)",
-                              "No Outcomes (%)"),
+                 colnames = c("Description", "Model Type", "Type-I Error",  "MSE",
+                               "Mean Precision", "Coverage", "EASE", "Type-II Error", "AUC",
+                              "No Outcomes (%)", "Linear (%)", "Monotonic (%)", "Non-estimable (%)"),
                  selection = "single",
                  options = list(
                    scrollX = TRUE,
                    autoWidth = TRUE,
+                   ordering = FALSE,
                    columnDefs = list(
-                     list(targets = c(1:7),
+                     list(targets = c(1:10),
                           width = '50px'),
                      list(targets = 0,
                           width = '200px')
